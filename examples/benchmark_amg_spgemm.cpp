@@ -93,7 +93,7 @@ int pack_mat(ParCSRMatrix* A, std::vector<char>& packed_array, MPI_Comm comm)
     MPI_Pack_size(1, MPI_INT, comm, &int_bytes);
     MPI_Pack_size(1, MPI_DOUBLE, comm, &double_bytes);
 
-    packed_array.resize((2*A->local_num_rows + nnz) * int_bytes + 
+    packed_array.resize((2*A->local_num_rows + nnz) * int_bytes +
             nnz * double_bytes);
 
     // Pack matrix (combining on_proc and off_proc)
@@ -106,14 +106,15 @@ int pack_mat(ParCSRMatrix* A, std::vector<char>& packed_array, MPI_Comm comm)
         // Calculate on_proc and off_proc sizes
         // Need to pack global rows indices, because coarse level idx aren't contiguous
         global_row = A->local_row_map[i];
-        MPI_Pack(&global_row, 1, MPI_INT, packed_array.data(), int_bytes, &ctr, comm);
+        MPI_Pack(&global_row, 1, MPI_INT, packed_array.data(), packed_array.size(), &ctr, comm);
 
         start_on = A->on_proc->idx1[i];
         end_on = A->on_proc->idx1[i+1];
         start_off = A->off_proc->idx1[i];
         end_off = A->off_proc->idx1[i+1];
         row_size = end_on - start_on + end_off - start_off;
-        MPI_Pack(&row_size, 1, MPI_INT, packed_array.data(), int_bytes, &ctr,
+
+        MPI_Pack(&row_size, 1, MPI_INT, packed_array.data(), packed_array.size(), &ctr,
                 comm);
 
         // Pack on_proc portion of row
@@ -121,11 +122,9 @@ int pack_mat(ParCSRMatrix* A, std::vector<char>& packed_array, MPI_Comm comm)
         {
             col = A->on_proc->idx2[j];
             global_col = A->on_proc_column_map[col];
-            MPI_Pack(&global_col, 1, MPI_INT, packed_array.data(), int_bytes, &ctr, 
-                    comm);
+            MPI_Pack(&global_col, 1, MPI_INT, packed_array.data(), packed_array.size(), &ctr, comm);
             val = A->on_proc->vals[j];
-            MPI_Pack(&val, 1, MPI_DOUBLE, packed_array.data(), double_bytes, &ctr, 
-                    comm);
+            MPI_Pack(&val, 1, MPI_DOUBLE, packed_array.data(), packed_array.size(), &ctr, comm);
         }
 
         // Pack off_proc portion of row
@@ -133,16 +132,16 @@ int pack_mat(ParCSRMatrix* A, std::vector<char>& packed_array, MPI_Comm comm)
         {
             col = A->off_proc->idx2[j];
             global_col = A->off_proc_column_map[col];
-            MPI_Pack(&global_col, 1, MPI_INT, packed_array.data(), int_bytes, &ctr, comm);
+            MPI_Pack(&global_col, 1, MPI_INT, packed_array.data(), packed_array.size(), &ctr, comm);
             val = A->off_proc->vals[j];
-            MPI_Pack(&val, 1, MPI_DOUBLE, packed_array.data(), double_bytes, &ctr, comm);
+            MPI_Pack(&val, 1, MPI_DOUBLE, packed_array.data(), packed_array.size(), &ctr, comm);
         }
     }
 
     return ctr;
 }
 
-void unpack_mat(ParCSRMatrix* A, CSRMatrix* recv_mat, char* recv_data, 
+void unpack_mat(ParCSRMatrix* A, CSRMatrix* recv_mat, char* recv_data,
         std::vector<int>& off_proc_col_to_proc, int count, int mat_proc,
         int* map_proc_ptr, int* tmp_row_ptr, MPI_Comm comm)
 {
